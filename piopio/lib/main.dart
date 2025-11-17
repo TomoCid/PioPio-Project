@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:location/location.dart';
 
 void main() {
   runApp(const PioPio());
@@ -16,13 +17,14 @@ class _PioPioState extends State<PioPio> {
   static const Color _selectedColor = Colors.black;
   static const Color _unselectedColor = Colors.black45;
 
+  final Location _location = Location();
+
   void _onItemTapped(int index) {
     setState(() {
       _selectedIndex = index;
     });
   }
 
-  // Helper function to build custom icon (PioPio Logo) with dynamic coloring
   Widget _buildCustomIcon(int index) {
     final color = _selectedIndex == index ? _selectedColor : _unselectedColor;
     return Image.asset(
@@ -30,17 +32,43 @@ class _PioPioState extends State<PioPio> {
       width: 50,
       height: 50,
       color: color,
-      //Use BlendMode.srcIn to properly tint a monochrome image.
       colorBlendMode: BlendMode.srcIn,
     );
   }
 
-  //Helper function to build standard icon with dynamic coloring.
   Widget _buildStandardIcon(IconData iconData, int index) {
     return Icon(
       iconData,
       color: _selectedIndex == index ? _selectedColor : _unselectedColor,
     );
+  }
+
+  // Aquí ocurre la magia de la localización
+  Future<void> _getLocation() async {
+    try {
+      bool serviceEnabled = await _location.serviceEnabled();
+      if (!serviceEnabled) {
+        serviceEnabled = await _location.requestService();
+        if (!serviceEnabled) {
+          print('Servicio de ubicación deshabilitado');
+          return;
+        }
+      }
+
+      PermissionStatus permissionGranted = await _location.hasPermission();
+      if (permissionGranted == PermissionStatus.denied) {
+        permissionGranted = await _location.requestPermission();
+        if (permissionGranted != PermissionStatus.granted) {
+          print('Permiso denegado');
+          return;
+        }
+      }
+
+      final locationData = await _location.getLocation();
+      print('Ubicación: Lat: ${locationData.latitude}, Lon: ${locationData.longitude}');
+    } catch (e) {
+      print('Error ubicación: $e');
+    }
   }
 
   @override
@@ -54,7 +82,7 @@ class _PioPioState extends State<PioPio> {
             },
             icon: const Icon(Icons.menu, color: Colors.black),
           ),
-          title: const Text('Piopio'),
+          title: const Text('Piopio', style: TextStyle(color: Colors.black)),
           centerTitle: true,
           backgroundColor: Colors.white,
           actions: <Widget>[
@@ -66,7 +94,6 @@ class _PioPioState extends State<PioPio> {
             ),
           ],
         ),
-
         body: Stack(
           children: <Widget>[
             Positioned.fill(
@@ -124,6 +151,7 @@ class _PioPioState extends State<PioPio> {
 
                   GestureDetector(
                     onTap: () {
+                      _getLocation(); // Llama a la función de localización :)
                       print('Escuchando pajaritos :D');
                     },
                     child: Container(
@@ -172,7 +200,6 @@ class _PioPioState extends State<PioPio> {
             ),
           ],
         ),
-
         bottomNavigationBar: BottomNavigationBar(
           type: BottomNavigationBarType.fixed,
           items: <BottomNavigationBarItem>[

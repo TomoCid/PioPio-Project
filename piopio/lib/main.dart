@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:location/location.dart';
+import 'package:record/record.dart';
+import 'package:path_provider/path_provider.dart';
 
 void main() {
   runApp(const PioPio());
@@ -18,6 +20,14 @@ class _PioPioState extends State<PioPio> {
   static const Color _unselectedColor = Colors.black45;
 
   final Location _location = Location();
+  
+  final AudioRecorder _recorder = AudioRecorder();
+
+  @override
+  void dispose() {
+    _recorder.dispose();
+    super.dispose();
+  }
 
   void _onItemTapped(int index) {
     setState(() {
@@ -43,7 +53,44 @@ class _PioPioState extends State<PioPio> {
     );
   }
 
-  // Aquí ocurre la magia de la localización
+  // Graba 5 segundos y guarda el archivo WAV.
+  Future<void> _recordForFiveSeconds() async {
+    try {
+      if (!await _recorder.hasPermission()) {
+        print('Permiso de micrófono denegado');
+        return;
+      }
+
+      final dir = await getExternalStorageDirectory();
+      if (dir == null) {
+        print('No se pudo acceder al directorio de almacenamiento.');
+        return;
+      }
+      
+      final filePath = '${dir.path}/record_${DateTime.now().millisecondsSinceEpoch}.wav';
+
+      await _recorder.start(
+        const RecordConfig(
+          encoder: AudioEncoder.pcm16bits, // Ojito que graba en formato WAV!!
+          bitRate: 128000,
+        ),
+        path: filePath,
+      );
+      print('Recording started -> $filePath');
+
+      await Future.delayed(const Duration(seconds: 5));
+
+      final savedPath = await _recorder.stop();
+      
+      if (savedPath != null) {
+        print('¡ÉXITO! El archivo WAV se guardó correctamente en: $savedPath');
+      }
+
+    } catch (e) {
+      print('Recording error: $e');
+    }
+  }
+
   Future<void> _getLocation() async {
     try {
       bool serviceEnabled = await _location.serviceEnabled();
@@ -105,12 +152,9 @@ class _PioPioState extends State<PioPio> {
                 mainAxisSize: MainAxisSize.min,
                 children: <Widget>[
                   Container(
-                    // Add padding around the text inside the box
                     padding: const EdgeInsets.all(16.0),
-                    // Add margin below the box to separate it from the button
                     margin: const EdgeInsets.only(bottom: 32.0),
                     decoration: BoxDecoration(
-                      // Semi-translucent dark background for contrast
                       color: Colors.black.withOpacity(0.5),
                       borderRadius: BorderRadius.circular(12.0),
                     ),
@@ -151,15 +195,15 @@ class _PioPioState extends State<PioPio> {
 
                   GestureDetector(
                     onTap: () {
-                      _getLocation(); // Llama a la función de localización :)
+                      _getLocation();
+                      _recordForFiveSeconds();
                       print('Escuchando pajaritos :D');
                     },
                     child: Container(
-                      width: 200, // Larger outer circle size
+                      width: 200,
                       height: 200,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        // Translucent white color
                         color: Colors.white.withOpacity(0.5),
                         boxShadow: [
                           BoxShadow(
@@ -170,13 +214,11 @@ class _PioPioState extends State<PioPio> {
                         ],
                       ),
                       child: Center(
-                        // Inner container for the logo, slightly smaller
                         child: Container(
                           width: 150,
                           height: 150,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            // Distinct shadow for the primary logo to make it pop
                             boxShadow: [
                               BoxShadow(
                                 color: Colors.black.withOpacity(0.2),
@@ -212,7 +254,7 @@ class _PioPioState extends State<PioPio> {
               label: 'Map',
             ),
             BottomNavigationBarItem(
-              icon: _buildCustomIcon(2), //Custom image icon.
+              icon: _buildCustomIcon(2),
               label: 'PioPio',
             ),
             BottomNavigationBarItem(

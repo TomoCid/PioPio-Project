@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:location/location.dart';
 import 'package:record/record.dart';
 import 'package:path_provider/path_provider.dart';
+import 'dart:io';
+
+import 'package:piopio/services/bird_detail_service.dart';
 
 void main() {
   runApp(const PioPio());
@@ -15,15 +18,24 @@ class PioPio extends StatefulWidget {
 }
 
 class _PioPioState extends State<PioPio> with SingleTickerProviderStateMixin {
+  // --- Configuración UI y Servicios ---
   int _selectedIndex = 2;
   static const Color _selectedColor = Colors.black;
   static const Color _unselectedColor = Colors.black45;
 
   final Location _location = Location();
   final AudioRecorder _recorder = AudioRecorder();
+  final BirdRecognitionService _recognitionService = BirdRecognitionService();
 
+  // --- Estado de la Aplicación y Animación ---
   late final AnimationController _pulseController;
-  bool _isRecording = false;
+  bool _isProcessing = false; // Indica si hay grabación o análisis en curso
+  String _statusMessage = 'Toca para empezar a grabar y identificar un ave.';
+  String? _lastResult; // Resultado final de la identificación
+
+  // --- NUEVAS VARIABLES DE DEPURACIÓN ---
+  String? _debugFilePath;
+  String? _debugLocation;
 
   @override
   void initState() {
@@ -49,6 +61,8 @@ class _PioPioState extends State<PioPio> with SingleTickerProviderStateMixin {
     });
   }
 
+  // --- Funciones de Utilidad (Íconos) ---
+
   Widget _buildCustomIcon(int index) {
     final color = _selectedIndex == index ? _selectedColor : _unselectedColor;
     return Image.asset(
@@ -67,90 +81,188 @@ class _PioPioState extends State<PioPio> with SingleTickerProviderStateMixin {
     );
   }
 
-  Future<void> _recordForFiveSeconds() async {
+  // --- Lógica Principal: Grabación, Ubicación y Envío al Servidor ---
+
+  Future<void> _startIdentificationProcess() async {
+    if (_isProcessing) return;
+
+    String? savedPath;
+
     try {
+      // 1. Inicializar UI: Preparando
+      setState(() {
+        _isProcessing = true;
+        _statusMessage = 'Grabando por 5 segundos...';
+        _lastResult = null;
+        _debugFilePath = null; // Limpiar path anterior
+      });
+
+      // 2. Comprobar permisos y empezar animación de pulso
       if (!await _recorder.hasPermission()) {
-        print('Permiso de micrófono denegado');
+        setState(() {
+          _statusMessage = 'Permiso de micrófono denegado.';
+        });
         return;
       }
-
-      setState(() {
-        _isRecording = true;
-      });
       _pulseController.repeat(reverse: true);
 
+      // Obtener ubicación (de forma asíncrona)
+      await _getLocation(); 
+
+      // Configuración de la ruta WAV
       final dir = await getExternalStorageDirectory();
       if (dir == null) {
-        print('No se pudo acceder al directorio de almacenamiento.');
+        setState(() {
+          _statusMessage = 'No se pudo acceder al directorio de almacenamiento.';
+        });
         return;
       }
       
       final filePath = '${dir.path}/record_${DateTime.now().millisecondsSinceEpoch}.wav';
 
+      // 3. Iniciar grabación (WAV - PCM 16 bits)
       await _recorder.start(
         const RecordConfig(
-          encoder: AudioEncoder.pcm16bits,
-          bitRate: 128000,
+          encoder: AudioEncoder.pcm16bits, // Formato WAV (PCM)
+          sampleRate: 16000, 
         ),
         path: filePath,
       );
-      print('Recording started -> $filePath');
+      print('Grabación iniciada en -> $filePath');
 
+      // Esperar 5 segundos
       await Future.delayed(const Duration(seconds: 5));
 
-      final savedPath = await _recorder.stop();
+      // 4. Detener grabación
+      savedPath = await _recorder.stop();
       
-      if (savedPath != null) {
-        print('¡ÉXITO! El archivo WAV se guardó correctamente en: $savedPath');
+      if (savedPath == null) {
+        throw Exception('Error: La ruta del archivo grabado es nula.');
       }
+      
+      // 4.1. ACTUALIZAR PATH DE DEBUG
+      setState(() {
+        _debugFilePath = savedPath;
+      });
+
+      print('¡ÉXITO! Archivo WAV guardado en: $savedPath');
+      
+      // 5. Actualizar UI: Análisis
+      setState(() {
+        _statusMessage = 'Enviando audio al servidor FastAPI...';
+      });
+
+      // 6. LLAMADA AL SERVICIO DE RECONOCIMIENTO
+      final result = await _recognitionService.identifyBird(savedPath);
+
+      // 7. Actualizar UI: Resultado exitoso
+      setState(() {
+        _statusMessage = 'Identificación Completa!';
+        _lastResult = '✅ ${result.commonName}\n(${result.scientificName})\nConfianza: ${result.confidence.toStringAsFixed(2)}';
+      });
+      
+      // Opcional: Eliminar el archivo temporal
+      File(savedPath).delete(); 
 
     } catch (e) {
-      print('Recording error: $e');
-    } finally {
+      // 8. Manejar error
+      print('Fallo el proceso de identificación: $e');
       setState(() {
-        _isRecording = false;
+        _statusMessage = '🚨 Error de Análisis/Conexión.';
+        _lastResult = 'Error: ${e.toString().split(':')[0].replaceAll("Exception", "Server Error")}'; 
+      });
+      
+      // Asegurar que el recorder se detiene si falló a mitad
+      if (await _recorder.isRecording()) {
+        await _recorder.stop();
+      }
+
+    } finally {
+      // 9. Finalizar procesamiento y animación
+      setState(() {
+        _isProcessing = false;
       });
       _pulseController.stop();
       _pulseController.reset();
     }
   }
 
+  // --- Lógica de Localización ---
+
   Future<void> _getLocation() async {
     try {
       bool serviceEnabled = await _location.serviceEnabled();
       if (!serviceEnabled) {
         serviceEnabled = await _location.requestService();
-        if (!serviceEnabled) {
-          print('Servicio de ubicación deshabilitado');
-          return;
-        }
+        if (!serviceEnabled) return;
       }
 
       PermissionStatus permissionGranted = await _location.hasPermission();
       if (permissionGranted == PermissionStatus.denied) {
         permissionGranted = await _location.requestPermission();
-        if (permissionGranted != PermissionStatus.granted) {
-          print('Permiso denegado');
-          return;
-        }
+        if (permissionGranted != PermissionStatus.granted) return;
       }
 
       final locationData = await _location.getLocation();
+      // ACTUALIZAR LOCATION DE DEBUG
+      setState(() {
+        _debugLocation = 'Lat: ${locationData.latitude?.toStringAsFixed(4)}, Lon: ${locationData.longitude?.toStringAsFixed(4)}';
+      });
       print('Ubicación: Lat: ${locationData.latitude}, Lon: ${locationData.longitude}');
     } catch (e) {
       print('Error ubicación: $e');
     }
   }
 
+  Widget _buildDebugPanel() {
+    if (_debugFilePath == null && _debugLocation == null && _lastResult == null) {
+      return Container();
+    }
+    
+    return Positioned(
+      left: 0,
+      right: 0,
+      bottom: 60, // Encima del BottomNavigationBar
+      child: Padding(
+        padding: const EdgeInsets.all(8.0),
+        child: Container(
+          padding: const EdgeInsets.all(12.0),
+          decoration: BoxDecoration(
+            color: Colors.blueGrey[900]?.withOpacity(0.85),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: Colors.blueAccent),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('--- DEBUG STATUS ---', style: TextStyle(color: Colors.yellow, fontWeight: FontWeight.bold)),
+              if (_debugLocation != null) 
+                Text('Ubicación: $_debugLocation', style: const TextStyle(color: Colors.white70, fontSize: 12)),
+              if (_debugFilePath != null) 
+                Text('Path WAV: ${_debugFilePath!.split('/').last}', style: const TextStyle(color: Colors.white70, fontSize: 12)),
+              if (_debugFilePath != null) 
+                const Text('Path Completo: Check Console', style: TextStyle(color: Colors.white70, fontSize: 12)),
+              if (_lastResult != null)
+                Text('Último Resultado: $_lastResult', style: TextStyle(color: _lastResult!.startsWith('✅') ? Colors.lightGreenAccent : Colors.redAccent[100], fontSize: 12)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // --- Widget Build ---
+
   @override
   Widget build(BuildContext context) {
+    final isRecordingOrAnalyzing = _isProcessing;
+    
     return MaterialApp(
       home: Scaffold(
         appBar: AppBar(
           leading: IconButton(
-            onPressed: () {
-              print('Botón de menú apretao >:)');
-            },
+            onPressed: () { print('Botón de menú apretao >:)'); },
             icon: const Icon(Icons.menu, color: Colors.black),
           ),
           title: const Text('Piopio', style: TextStyle(color: Colors.black)),
@@ -158,9 +270,7 @@ class _PioPioState extends State<PioPio> with SingleTickerProviderStateMixin {
           backgroundColor: Colors.white,
           actions: <Widget>[
             IconButton(
-              onPressed: () {
-                print('Botón de configuración apretao >:D');
-              },
+              onPressed: () { print('Botón de configuración apretao >:D'); },
               icon: const Icon(Icons.display_settings, color: Colors.black),
             ),
           ],
@@ -175,17 +285,19 @@ class _PioPioState extends State<PioPio> with SingleTickerProviderStateMixin {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: <Widget>[
+                  // Contenedor de Texto de Estado y Resultado
                   Container(
+                    width: MediaQuery.of(context).size.width * 0.8,
                     padding: const EdgeInsets.all(16.0),
                     margin: const EdgeInsets.only(bottom: 32.0),
                     decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.5),
+                      color: Colors.black.withOpacity(0.6),
                       borderRadius: BorderRadius.circular(12.0),
                     ),
-                    child: const Column(
+                    child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: <Widget>[
-                        Text(
+                        const Text(
                           'Identify Bird Songs',
                           style: TextStyle(
                             fontSize: 30.0,
@@ -193,37 +305,40 @@ class _PioPioState extends State<PioPio> with SingleTickerProviderStateMixin {
                             color: Colors.white,
                           ),
                         ),
-                        SizedBox(height: 8),
-
+                        const SizedBox(height: 12),
+                        // Mensaje de estado dinámico
                         Text(
-                          'Tap the button below to start recording.',
+                          _statusMessage,
+                          textAlign: TextAlign.center,
                           style: TextStyle(
-                            fontSize: 15.0,
+                            fontSize: 18.0,
                             fontStyle: FontStyle.italic,
-                            color: Colors.white70,
+                            color: _pulseController.isAnimating ? Colors.redAccent : Colors.white70,
                           ),
                         ),
-                        SizedBox(height: 4),
-
-                        Text(
-                          'The app will identify bird songs for you!',
-                          style: TextStyle(
-                            fontSize: 15.0,
-                            fontStyle: FontStyle.italic,
-                            color: Colors.white70,
+                        
+                        // Resultado de la identificación
+                        if (_lastResult != null) ...[
+                          const SizedBox(height: 12),
+                          const Divider(color: Colors.white38),
+                          Text(
+                            _lastResult!,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 18.0,
+                              fontWeight: FontWeight.bold,
+                              // Color según si hubo éxito (verde) o error (rojo)
+                              color: _lastResult!.startsWith('✅') ? Colors.lightGreenAccent : Colors.redAccent[100],
+                            ),
                           ),
-                        ),
+                        ],
                       ],
                     ),
                   ),
 
+                  // Botón Central (Tap to Record)
                   GestureDetector(
-                    onTap: () {
-                      if (_isRecording) return;
-                      _getLocation();
-                      _recordForFiveSeconds();
-                      print('Escuchando pajaritos :D');
-                    },
+                    onTap: isRecordingOrAnalyzing ? null : _startIdentificationProcess, // Deshabilita el tap si está procesando
                     child: ScaleTransition(
                       scale: _pulseController,
                       child: Container(
@@ -231,12 +346,12 @@ class _PioPioState extends State<PioPio> with SingleTickerProviderStateMixin {
                         height: 200,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          color: Colors.white.withOpacity(0.5),
+                          color: isRecordingOrAnalyzing ? Colors.red.withOpacity(0.7) : Colors.white.withOpacity(0.5),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.1),
-                              blurRadius: 10,
-                              spreadRadius: 1,
+                              color: Colors.black.withOpacity(0.2),
+                              blurRadius: 15,
+                              spreadRadius: 2,
                             ),
                           ],
                         ),
@@ -244,21 +359,16 @@ class _PioPioState extends State<PioPio> with SingleTickerProviderStateMixin {
                           child: Container(
                             width: 150,
                             height: 150,
-                            decoration: BoxDecoration(
+                            decoration: const BoxDecoration(
                               shape: BoxShape.circle,
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.2),
-                                  blurRadius: 15,
-                                  spreadRadius: 2,
-                                ),
-                              ],
                             ),
                             child: ClipOval(
-                              child: Image.asset(
-                                'assets/logo.png',
-                                fit: BoxFit.cover,
-                              ),
+                              child: isRecordingOrAnalyzing
+                                ? const Center(child: CircularProgressIndicator(color: Colors.white, strokeWidth: 5)) // Indicador de carga
+                                : Image.asset(
+                                    'assets/logo.png',
+                                    fit: BoxFit.cover,
+                                  ),
                             ),
                           ),
                         ),
@@ -268,6 +378,9 @@ class _PioPioState extends State<PioPio> with SingleTickerProviderStateMixin {
                 ],
               ),
             ),
+
+            // PANEL DE DEPURACIÓN
+            _buildDebugPanel(),
           ],
         ),
         bottomNavigationBar: BottomNavigationBar(

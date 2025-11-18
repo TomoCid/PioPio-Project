@@ -21,7 +21,7 @@ async def root():
 
 @app.post("/identificarAve")
 async def identificar_ave(file: UploadFile = File(...)):
-    with tempfile.NamedTemporaryFile(delete=True, suffix=".mp3") as temp:
+    with tempfile.NamedTemporaryFile(delete=True, suffix=".wav") as temp:
         audio = await file.read()
         temp.write(audio)
         temp.flush()

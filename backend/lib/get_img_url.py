@@ -7,7 +7,6 @@ def replace_last(s, t, nt):
 async def get_img_url(scientific_name: str):
     lang_code = "en"
     search_query = scientific_name
-    print(search_query)
     results = 1
     headers = { "User-Agent": "pio pio" }
     base_url = "https://api.wikimedia.org/core/v1/wikipedia/"

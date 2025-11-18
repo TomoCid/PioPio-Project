@@ -14,17 +14,31 @@ class PioPio extends StatefulWidget {
   State<PioPio> createState() => _PioPioState();
 }
 
-class _PioPioState extends State<PioPio> {
+class _PioPioState extends State<PioPio> with SingleTickerProviderStateMixin {
   int _selectedIndex = 2;
   static const Color _selectedColor = Colors.black;
   static const Color _unselectedColor = Colors.black45;
 
   final Location _location = Location();
-  
   final AudioRecorder _recorder = AudioRecorder();
+
+  late final AnimationController _pulseController;
+  bool _isRecording = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+      lowerBound: 0.95,
+      upperBound: 1.05,
+    );
+  }
 
   @override
   void dispose() {
+    _pulseController.dispose();
     _recorder.dispose();
     super.dispose();
   }
@@ -53,13 +67,17 @@ class _PioPioState extends State<PioPio> {
     );
   }
 
-  // Graba 5 segundos y guarda el archivo WAV.
   Future<void> _recordForFiveSeconds() async {
     try {
       if (!await _recorder.hasPermission()) {
         print('Permiso de micrófono denegado');
         return;
       }
+
+      setState(() {
+        _isRecording = true;
+      });
+      _pulseController.repeat(reverse: true);
 
       final dir = await getExternalStorageDirectory();
       if (dir == null) {
@@ -71,7 +89,7 @@ class _PioPioState extends State<PioPio> {
 
       await _recorder.start(
         const RecordConfig(
-          encoder: AudioEncoder.pcm16bits, // Ojito que graba en formato WAV!!
+          encoder: AudioEncoder.pcm16bits,
           bitRate: 128000,
         ),
         path: filePath,
@@ -88,6 +106,12 @@ class _PioPioState extends State<PioPio> {
 
     } catch (e) {
       print('Recording error: $e');
+    } finally {
+      setState(() {
+        _isRecording = false;
+      });
+      _pulseController.stop();
+      _pulseController.reset();
     }
   }
 
@@ -195,42 +219,46 @@ class _PioPioState extends State<PioPio> {
 
                   GestureDetector(
                     onTap: () {
+                      if (_isRecording) return;
                       _getLocation();
                       _recordForFiveSeconds();
                       print('Escuchando pajaritos :D');
                     },
-                    child: Container(
-                      width: 200,
-                      height: 200,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: Colors.white.withOpacity(0.5),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.1),
-                            blurRadius: 10,
-                            spreadRadius: 1,
-                          ),
-                        ],
-                      ),
-                      child: Center(
-                        child: Container(
-                          width: 150,
-                          height: 150,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.2),
-                                blurRadius: 15,
-                                spreadRadius: 2,
+                    child: ScaleTransition(
+                      scale: _pulseController,
+                      child: Container(
+                        width: 200,
+                        height: 200,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Colors.white.withOpacity(0.5),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.1),
+                              blurRadius: 10,
+                              spreadRadius: 1,
+                            ),
+                          ],
+                        ),
+                        child: Center(
+                          child: Container(
+                            width: 150,
+                            height: 150,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.2),
+                                  blurRadius: 15,
+                                  spreadRadius: 2,
+                                ),
+                              ],
+                            ),
+                            child: ClipOval(
+                              child: Image.asset(
+                                'assets/logo.png',
+                                fit: BoxFit.cover,
                               ),
-                            ],
-                          ),
-                          child: ClipOval(
-                            child: Image.asset(
-                              'assets/logo.png',
-                              fit: BoxFit.cover,
                             ),
                           ),
                         ),

@@ -1,6 +1,7 @@
 from fastapi import FastAPI, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 import tempfile
+from lib.get_img_url import get_img_url
 
 
 app = FastAPI()
@@ -33,7 +34,10 @@ async def identificar_ave(file: UploadFile = File(...)):
         '''
         resultado = None
 
-        # TODO: aca puede ir la funcion que busque las imagenes
+        # el nomre cientifico lo da el modelo
+        scientific_name = "Turdus Falcklandii"
+        img_url = await get_img_url(scientific_name)
+
 
     return {
         "common_name": resultado['common_name'],

@@ -1,0 +1,5 @@
+*/__pycache__/
+/backend/piopioenv/*
+/backend/venv/*
+/backend/.env
+

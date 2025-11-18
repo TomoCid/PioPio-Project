@@ -1,0 +1,141 @@
+{
+	"configurations" : 
+	[
+		{
+			"directories" : 
+			[
+				{
+					"build" : ".",
+					"childIndexes" : 
+					[
+						1,
+						2,
+						3
+					],
+					"hasInstallRule" : true,
+					"jsonFile" : "directory-.-Debug-d86f3f0fd74ea567e600.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.13"
+					},
+					"projectIndex" : 0,
+					"source" : "."
+				},
+				{
+					"build" : "flutter",
+					"jsonFile" : "directory-flutter-Debug-228115e0cfb1b7105c38.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.10"
+					},
+					"parentIndex" : 0,
+					"projectIndex" : 0,
+					"source" : "flutter",
+					"targetIndexes" : 
+					[
+						0
+					]
+				},
+				{
+					"build" : "runner",
+					"jsonFile" : "directory-runner-Debug-9244a657b8798de06d7f.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.13"
+					},
+					"parentIndex" : 0,
+					"projectIndex" : 0,
+					"source" : "runner",
+					"targetIndexes" : 
+					[
+						1
+					]
+				},
+				{
+					"build" : "plugins/record_linux",
+					"jsonFile" : "directory-plugins.record_linux-Debug-34f7e4258ca01e3cc448.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.10"
+					},
+					"parentIndex" : 0,
+					"projectIndex" : 1,
+					"source" : "flutter/ephemeral/.plugin_symlinks/record_linux/linux",
+					"targetIndexes" : 
+					[
+						2
+					]
+				}
+			],
+			"name" : "Debug",
+			"projects" : 
+			[
+				{
+					"childIndexes" : 
+					[
+						1
+					],
+					"directoryIndexes" : 
+					[
+						0,
+						1,
+						2
+					],
+					"name" : "runner",
+					"targetIndexes" : 
+					[
+						0,
+						1
+					]
+				},
+				{
+					"directoryIndexes" : 
+					[
+						3
+					],
+					"name" : "record_linux",
+					"parentIndex" : 0,
+					"targetIndexes" : 
+					[
+						2
+					]
+				}
+			],
+			"targets" : 
+			[
+				{
+					"directoryIndex" : 1,
+					"id" : "flutter_assemble::@2bb09fbb03a373b2cb34",
+					"jsonFile" : "target-flutter_assemble-Debug-02d50ea1941507c9d787.json",
+					"name" : "flutter_assemble",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 2,
+					"id" : "piopio::@056c4f61b0156d1d9b06",
+					"jsonFile" : "target-piopio-Debug-6646937c894ead4ad3ec.json",
+					"name" : "piopio",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 3,
+					"id" : "record_linux_plugin::@b712bbce9ef40153e2cb",
+					"jsonFile" : "target-record_linux_plugin-Debug-1211e343658e989903fe.json",
+					"name" : "record_linux_plugin",
+					"projectIndex" : 1
+				}
+			]
+		}
+	],
+	"kind" : "codemodel",
+	"paths" : 
+	{
+		"build" : "/home/ccserm/Documents/ws/udec/proyectoInf/PioPio-Project/build",
+		"source" : "/home/ccserm/Documents/ws/udec/proyectoInf/PioPio-Project/piopio/linux"
+	},
+	"version" : 
+	{
+		"major" : 2,
+		"minor" : 6
+	}
+}

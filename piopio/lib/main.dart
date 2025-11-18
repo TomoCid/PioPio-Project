@@ -91,6 +91,128 @@ class _PioPioState extends State<PioPio> with SingleTickerProviderStateMixin {
     );
   }
 
+  // --- Lógica Principal: Grabación, Ubicación y Envío al Servidor ---
+
+  Future<void> _startIdentificationProcess() async {
+    if (_isProcessing) return;
+
+    String? savedPath;
+
+    try {
+      // 1. Inicializar UI: Preparando
+      setState(() {
+        _isProcessing = true;
+        _statusMessage = 'Grabando por 5 segundos...';
+        _lastResult = null;
+        _debugFilePath = null; 
+      });
+
+      // 2. Comprobar permisos y empezar animación de pulso
+      if (!await _recorder.hasPermission()) {
+        setState(() {
+          _statusMessage = 'Permiso de micrófono denegado.';
+        });
+        return;
+      }
+      _pulseController.repeat(reverse: true);
+
+      // Obtener ubicación (de forma asíncrona)
+      await _getLocation(); 
+
+      // Verificar si tenemos ubicación para enviar
+      if (_lastLocationData?.latitude == null || _lastLocationData?.longitude == null) {
+        throw Exception("Ubicación no disponible. Necesaria para la API.");
+      }
+
+      // Configuración de la ruta WAV
+      final dir = await getTemporaryDirectory(); 
+      if (dir == null) {
+        setState(() {
+          _statusMessage = 'No se pudo acceder al directorio de almacenamiento.';
+        });
+        return;
+      }
+      
+      final filePath = '${dir.path}/record_${DateTime.now().millisecondsSinceEpoch}.wav';
+
+      // 3. Iniciar grabación (WAV)
+      await _recorder.start(
+        const RecordConfig(
+          encoder: AudioEncoder.pcm16bits, 
+          sampleRate: 16000, 
+        ),
+        path: filePath,
+      );
+      print('Grabación iniciada en -> $filePath (WAV)');
+
+      // Esperar 5 segundos
+      await Future.delayed(const Duration(seconds: 5));
+
+      // 4. Detener grabación
+      savedPath = await _recorder.stop();
+      
+      if (savedPath == null) {
+        throw Exception('Error: La ruta del archivo grabado es nula.');
+      }
+      
+      // 4.1. ACTUALIZAR PATH DE DEBUG
+      setState(() {
+        _debugFilePath = savedPath;
+      });
+
+      print('¡ÉXITO! Archivo WAV guardado en: $savedPath');
+      
+      // 5. Actualizar UI: Análisis
+      setState(() {
+        _statusMessage = 'Enviando audio y GPS al servidor Render...';
+      });
+
+      // 6. LLAMADA AL SERVICIO DE RECONOCIMIENTO (Pasando Lat/Lon)
+      final result = await _recognitionService.identifyBird(
+        savedPath, 
+        _lastLocationData!.latitude!, 
+        _lastLocationData!.longitude!,
+      );
+
+      // 7. Actualizar UI: Resultado exitoso con el nuevo JSON
+      setState(() {
+        _statusMessage = 'Identificación Completa!';
+        
+        if (!result.error) {
+          _lastResult = 'AVE ENCONTRADA:\n${result.scientificName}\nUbicación: ${result.lat.toStringAsFixed(4)}, ${result.lon.toStringAsFixed(4)}';
+        } else {
+          _lastResult = 'No se pudo identificar el ave. \nDatos recibidos: ${result.filename}';
+        }
+      });
+      
+      // Opcional: Eliminar el archivo temporal
+      File(savedPath).delete(); 
+
+    } catch (e) {
+      // 8. Manejar error
+      print('Fallo el proceso de identificación: $e');
+      setState(() {
+        _statusMessage = 'Error de Análisis/Conexión.';
+        _lastResult = 'Error: ${e.toString().split(':')[0].replaceAll("Exception", "Server Error")}'; 
+      });
+      
+      // Asegurar que el recorder se detiene si falló a mitad
+      if (await _recorder.isRecording()) {
+        await _recorder.stop();
+      }
+
+    } finally {
+      // 9. Finalizar procesamiento y animación
+      setState(() {
+        _isProcessing = false;
+      });
+      _pulseController.stop();
+      _pulseController.reset();
+    }
+  }
+
+  // --- Lógica de Localización ---
+
   Future<void> _getLocation() async {
     try {
       bool serviceEnabled = await _location.serviceEnabled();
@@ -106,101 +228,21 @@ class _PioPioState extends State<PioPio> with SingleTickerProviderStateMixin {
       }
 
       final locationData = await _location.getLocation();
+      
+      // GUARDAR Y ACTUALIZAR LOCATION DE DEBUG
       setState(() {
         _lastLocationData = locationData;
-        _debugLocation =
-            'Lat: ${locationData.latitude?.toStringAsFixed(4)}, Lon: ${locationData.longitude?.toStringAsFixed(4)}';
+        _debugLocation = 'Lat: ${locationData.latitude?.toStringAsFixed(4)}, Lon: ${locationData.longitude?.toStringAsFixed(4)}';
       });
+      print('Ubicación: Lat: ${locationData.latitude}, Lon: ${locationData.longitude}');
     } catch (e) {
       print('Error ubicación: $e');
     }
   }
-/*
-  Future<void> _recordForFiveSeconds() async {
-    if (_isProcessing) return;
 
-    String? savedPath;
-    try {
-      setState(() {
-        _isProcessing = true;
-        _statusMessage = 'Grabando por 5 segundos...';
-        _lastResult = null;
-        _debugFilePath = null;
-      });
 
-      if (!await _recorder.hasPermission()) {
-        setState(() {
-          _statusMessage = 'Permiso de micrófono denegado.';
-        });
-        return;
-      }
 
-      _pulseController.repeat(reverse: true);
-      await _getLocation();
 
-      final dir = await getTemporaryDirectory();
-      final filePath =
-          '${dir.path}/record_${DateTime.now().millisecondsSinceEpoch}.wav';
-
-      await _recorder.start( 
-        const RecordConfig( 
-          encoder: AudioEncoder.pcm16bits, 
-          sampleRate: 16000, 
-          ), 
-          path: filePath, 
-        );
-
-      await Future.delayed(const Duration(seconds: 5));
-      savedPath = await _recorder.stop();
-
-      if (savedPath == null) throw Exception('Archivo nulo');
-
-      setState(() {
-        _debugFilePath = savedPath;
-        _statusMessage = 'Enviando audio y GPS al servidor...';
-      });
-
-      final result = await _recognitionService.identifyBird(
-        savedPath,
-        _lastLocationData!.latitude!,
-        _lastLocationData!.longitude!,
-      );
-
-      setState(() {
-        _statusMessage = 'Identificación completa!';
-        if (!result.error) {
-          _lastResult =
-              '✅ Ave encontrada: ${result.scientificName}\nLat: ${result.lat.toStringAsFixed(4)}, Lon: ${result.lon.toStringAsFixed(4)}';
-        } else {
-          _lastResult = '❌ No se pudo identificar el ave.';
-        }
-      });
-
-      File(savedPath).delete();
-
-      // Mostrar popup y lanzar confeti
-      _showBirdRecognitionPopup(
-        imagePath: 'assets/pimpollo.jpg',
-        commonName: 'Pimpollo',
-        scientificName: 'Rollandia rolland',
-      );
-      _confettiController.play();
-    } catch (e) {
-      print('Error: $e');
-      setState(() {
-        _statusMessage = 'Error de análisis/conexión.';
-        _lastResult = '❌ Error: ${e.toString().split(':')[0]}';
-      });
-      if (await _recorder.isRecording()) await _recorder.stop();
-    } finally {
-      setState(() {
-        _isProcessing = false;
-      });
-      _pulseController.stop();
-      _pulseController.reset();
-    }
-  }
-*/
 void _showBirdRecognitionPopup({
     required String imagePath,
     required String commonName,
@@ -258,7 +300,7 @@ void _showBirdRecognitionPopup({
                         ),
                         ElevatedButton.icon(
                           onPressed: () {
-                            print("Ver detalles del ave");
+                            print("Ver detalles del piopio");
                           },
                           icon: const Icon(Icons.info_outline),
                           label: const Text("Detalles"),
@@ -389,40 +431,40 @@ void _showBirdRecognitionPopup({
                   ),
                 ),
                 GestureDetector(
-                  // Tap sigue comentado, solo LongPress para popup
-                  onTap: null,
-                  onLongPress: () {
-                    _showBirdRecognitionPopup(
-                      imagePath: 'assets/pimpollo.jpg',
-                      commonName: 'Pimpollo',
-                      scientificName: 'Rollandia rolland',
-                    );
-                    _confettiController.play();
-                  },
-                  child: ScaleTransition(
-                    scale: _pulseController,
-                    child: Container(
-                      width: 200,
-                      height: 200,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: Colors.white.withOpacity(0.5),
-                        boxShadow: [
-                          BoxShadow(
-                              color: Colors.black.withOpacity(0.2),
-                              blurRadius: 15,
-                              spreadRadius: 2)
-                        ],
-                      ),
-                      child: Center(
-                        child: ClipOval(
-                          child:
-                              Image.asset('assets/logo.png', fit: BoxFit.cover),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
+                  // Tap inicia el proceso de identificación (si no está procesando)
+                  onTap: isRecordingOrAnalyzing ? null : _startIdentificationProcess,
+                   onLongPress: () {
+                     _showBirdRecognitionPopup(
+                       imagePath: 'assets/pimpollo.jpg',
+                       commonName: 'Pimpollo',
+                       scientificName: 'Rollandia rolland',
+                     );
+                     _confettiController.play();
+                   },
+                   child: ScaleTransition(
+                     scale: _pulseController,
+                     child: Container(
+                       width: 200,
+                       height: 200,
+                       decoration: BoxDecoration(
+                         shape: BoxShape.circle,
+                         color: Colors.white.withOpacity(0.5),
+                         boxShadow: [
+                           BoxShadow(
+                               color: Colors.black.withOpacity(0.2),
+                               blurRadius: 15,
+                               spreadRadius: 2)
+                         ],
+                       ),
+                       child: Center(
+                         child: ClipOval(
+                           child:
+                               Image.asset('assets/logo.png', fit: BoxFit.cover),
+                         ),
+                       ),
+                     ),
+                   ),
+                 ),
               ],
             ),
           ),

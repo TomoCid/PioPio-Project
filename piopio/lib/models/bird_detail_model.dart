@@ -1,22 +1,32 @@
-// Clase detalle de un pájaro (Ajustar según los datos disponibles en la API y los que sean requeridos)
 class BirdDetailResult {
-  final String commonName;
   final String scientificName;
-  final double confidence; 
-  // Ajustar según los datos disponibles en la API
+  final String filename;
+  final double lat;
+  final double lon;
+  final String date;
+  final bool error;
+  final double? confidence; 
 
   BirdDetailResult({
-    required this.commonName,
     required this.scientificName,
-    required this.confidence,
-    // Ajustar según los datos disponibles en la API,
+    required this.filename,
+    required this.lat,
+    required this.lon,
+    required this.date,
+    required this.error,
+    this.confidence,
   });
 
   factory BirdDetailResult.fromJson(Map<String, dynamic> json) {
     return BirdDetailResult(
-      commonName: json['commonName'] as String,
-      scientificName: json['scientificName'] as String,
-      confidence: (json['confidence'] as num).toDouble(),
+      // Mapeo de campos
+      scientificName: json['scientific_name'] as String? ?? 'N/A',
+      filename: json['filename'] as String? ?? 'N/A',
+      lat: (json['lat'] as num?)?.toDouble() ?? 0.0,
+      lon: (json['lon'] as num?)?.toDouble() ?? 0.0,
+      date: json['date'] as String? ?? 'N/A',
+      error: json['error'] as bool? ?? true,
+      confidence: (json['confidence'] as num?)?.toDouble(),
     );
   }
 }

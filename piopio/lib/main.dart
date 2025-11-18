@@ -4,7 +4,8 @@ import 'package:record/record.dart';
 import 'package:path_provider/path_provider.dart';
 import 'dart:io';
 
-import 'package:piopio/services/bird_detail_service.dart';
+// Importación de tu servicio de reconocimiento
+import 'services/bird_detail_service.dart'; 
 
 void main() {
   runApp(const PioPio());
@@ -33,9 +34,10 @@ class _PioPioState extends State<PioPio> with SingleTickerProviderStateMixin {
   String _statusMessage = 'Toca para empezar a grabar y identificar un ave.';
   String? _lastResult; // Resultado final de la identificación
 
-  // --- NUEVAS VARIABLES DE DEPURACIÓN ---
+  // --- VARIABLES DE DEPURACIÓN Y DATOS ---
   String? _debugFilePath;
   String? _debugLocation;
+  LocationData? _lastLocationData; // Para almacenar la ubicación y pasarla al servicio
 
   @override
   void initState() {
@@ -94,7 +96,7 @@ class _PioPioState extends State<PioPio> with SingleTickerProviderStateMixin {
         _isProcessing = true;
         _statusMessage = 'Grabando por 5 segundos...';
         _lastResult = null;
-        _debugFilePath = null; // Limpiar path anterior
+        _debugFilePath = null; 
       });
 
       // 2. Comprobar permisos y empezar animación de pulso
@@ -109,8 +111,13 @@ class _PioPioState extends State<PioPio> with SingleTickerProviderStateMixin {
       // Obtener ubicación (de forma asíncrona)
       await _getLocation(); 
 
+      // Verificar si tenemos ubicación para enviar
+      if (_lastLocationData?.latitude == null || _lastLocationData?.longitude == null) {
+        throw Exception("Ubicación no disponible. Necesaria para la API.");
+      }
+
       // Configuración de la ruta WAV
-      final dir = await getExternalStorageDirectory();
+      final dir = await getTemporaryDirectory(); 
       if (dir == null) {
         setState(() {
           _statusMessage = 'No se pudo acceder al directorio de almacenamiento.';
@@ -120,15 +127,15 @@ class _PioPioState extends State<PioPio> with SingleTickerProviderStateMixin {
       
       final filePath = '${dir.path}/record_${DateTime.now().millisecondsSinceEpoch}.wav';
 
-      // 3. Iniciar grabación (WAV - PCM 16 bits)
+      // 3. Iniciar grabación (WAV)
       await _recorder.start(
         const RecordConfig(
-          encoder: AudioEncoder.pcm16bits, // Formato WAV (PCM)
+          encoder: AudioEncoder.pcm16bits, 
           sampleRate: 16000, 
         ),
         path: filePath,
       );
-      print('Grabación iniciada en -> $filePath');
+      print('Grabación iniciada en -> $filePath (WAV)');
 
       // Esperar 5 segundos
       await Future.delayed(const Duration(seconds: 5));
@@ -149,16 +156,25 @@ class _PioPioState extends State<PioPio> with SingleTickerProviderStateMixin {
       
       // 5. Actualizar UI: Análisis
       setState(() {
-        _statusMessage = 'Enviando audio al servidor FastAPI...';
+        _statusMessage = 'Enviando audio y GPS al servidor Render...';
       });
 
-      // 6. LLAMADA AL SERVICIO DE RECONOCIMIENTO
-      final result = await _recognitionService.identifyBird(savedPath);
+      // 6. LLAMADA AL SERVICIO DE RECONOCIMIENTO (Pasando Lat/Lon)
+      final result = await _recognitionService.identifyBird(
+        savedPath, 
+        _lastLocationData!.latitude!, 
+        _lastLocationData!.longitude!,
+      );
 
-      // 7. Actualizar UI: Resultado exitoso
+      // 7. Actualizar UI: Resultado exitoso con el nuevo JSON
       setState(() {
         _statusMessage = 'Identificación Completa!';
-        _lastResult = '✅ ${result.commonName}\n(${result.scientificName})\nConfianza: ${result.confidence.toStringAsFixed(2)}';
+        
+        if (!result.error) {
+          _lastResult = 'AVE ENCONTRADA:\n${result.scientificName}\nUbicación: ${result.lat.toStringAsFixed(4)}, ${result.lon.toStringAsFixed(4)}';
+        } else {
+          _lastResult = 'No se pudo identificar el ave. \nDatos recibidos: ${result.filename}';
+        }
       });
       
       // Opcional: Eliminar el archivo temporal
@@ -168,7 +184,7 @@ class _PioPioState extends State<PioPio> with SingleTickerProviderStateMixin {
       // 8. Manejar error
       print('Fallo el proceso de identificación: $e');
       setState(() {
-        _statusMessage = '🚨 Error de Análisis/Conexión.';
+        _statusMessage = 'Error de Análisis/Conexión.';
         _lastResult = 'Error: ${e.toString().split(':')[0].replaceAll("Exception", "Server Error")}'; 
       });
       
@@ -204,8 +220,10 @@ class _PioPioState extends State<PioPio> with SingleTickerProviderStateMixin {
       }
 
       final locationData = await _location.getLocation();
-      // ACTUALIZAR LOCATION DE DEBUG
+      
+      // GUARDAR Y ACTUALIZAR LOCATION DE DEBUG
       setState(() {
+        _lastLocationData = locationData;
         _debugLocation = 'Lat: ${locationData.latitude?.toStringAsFixed(4)}, Lon: ${locationData.longitude?.toStringAsFixed(4)}';
       });
       print('Ubicación: Lat: ${locationData.latitude}, Lon: ${locationData.longitude}');
@@ -214,6 +232,7 @@ class _PioPioState extends State<PioPio> with SingleTickerProviderStateMixin {
     }
   }
 
+  // --- Panel de Depuración ---
   Widget _buildDebugPanel() {
     if (_debugFilePath == null && _debugLocation == null && _lastResult == null) {
       return Container();
@@ -379,7 +398,7 @@ class _PioPioState extends State<PioPio> with SingleTickerProviderStateMixin {
               ),
             ),
 
-            // PANEL DE DEPURACIÓN
+            // PANEL DE DEPURACIÓN AÑADIDO
             _buildDebugPanel(),
           ],
         ),

@@ -127,10 +127,7 @@ class _PioPioState extends State<PioPio> with SingleTickerProviderStateMixin {
       // Configuración de la ruta WAV
       final dir = await getTemporaryDirectory(); 
       if (dir == null) {
-        setState(() {
-          _statusMessage = 'No se pudo acceder al directorio de almacenamiento.';
-        });
-        return;
+        throw Exception("No se pudo acceder al directorio temporal.");
       }
       
       final filePath = '${dir.path}/record_${DateTime.now().millisecondsSinceEpoch}.wav';
@@ -138,8 +135,8 @@ class _PioPioState extends State<PioPio> with SingleTickerProviderStateMixin {
       // 3. Iniciar grabación (WAV)
       await _recorder.start(
         const RecordConfig(
-          encoder: AudioEncoder.pcm16bits, 
-          sampleRate: 16000, 
+          encoder: AudioEncoder.wav, // Asegúrate de que esté en .wav
+          sampleRate: 16000, // Frecuencia de muestreo estándar para reconocimiento
         ),
         path: filePath,
       );
@@ -186,7 +183,7 @@ class _PioPioState extends State<PioPio> with SingleTickerProviderStateMixin {
       });
       
       // Opcional: Eliminar el archivo temporal
-      File(savedPath).delete(); 
+      //File(savedPath).delete(); 
 
     } catch (e) {
       // 8. Manejar error
@@ -300,7 +297,7 @@ void _showBirdRecognitionPopup({
                         ),
                         ElevatedButton.icon(
                           onPressed: () {
-                            print("Ver detalles del piopio");
+                            print("Ver detalles del ave");
                           },
                           icon: const Icon(Icons.info_outline),
                           label: const Text("Detalles"),

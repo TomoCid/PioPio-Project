@@ -124,10 +124,10 @@ class _PioPioState extends State<PioPio> with SingleTickerProviderStateMixin {
         throw Exception("Ubicación no disponible. Necesaria para la API.");
       }
 
-      // Configuración de la ruta WAV
-      final dir = await getTemporaryDirectory(); 
+      final dir = await getExternalStorageDirectory();
       if (dir == null) {
-        throw Exception("No se pudo acceder al directorio temporal.");
+        print('No se pudo acceder al directorio de almacenamiento.');
+        return;
       }
       
       final filePath = '${dir.path}/record_${DateTime.now().millisecondsSinceEpoch}.wav';
@@ -135,8 +135,9 @@ class _PioPioState extends State<PioPio> with SingleTickerProviderStateMixin {
       // 3. Iniciar grabación (WAV)
       await _recorder.start(
         const RecordConfig(
-          encoder: AudioEncoder.wav, // Asegúrate de que esté en .wav
-          sampleRate: 16000, // Frecuencia de muestreo estándar para reconocimiento
+          encoder: AudioEncoder.wav, 
+          sampleRate: 16000,        
+          numChannels: 1,         
         ),
         path: filePath,
       );

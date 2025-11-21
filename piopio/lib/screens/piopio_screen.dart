@@ -349,11 +349,11 @@ class _PioPioState extends State<PioPio> with SingleTickerProviderStateMixin {
           ),
 
           /// --- WIDGET SEPARADO ---
-          DebugPanel(
-            debugFilePath: _debugFilePath,
-            debugLocation: _debugLocation,
-            lastResult: _lastResult,
-          ),
+          //DebugPanel(
+           // debugFilePath: _debugFilePath,
+            //debugLocation: _debugLocation,
+          //  lastResult: _lastResult,
+         // ),
         ],
       ),
       bottomNavigationBar: BottomNavigationBar(

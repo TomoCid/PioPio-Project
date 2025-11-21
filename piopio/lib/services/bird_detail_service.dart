@@ -63,5 +63,4 @@ class BirdRecognitionService {
     }
   }
 
-  // Aquí puedes agregar más funciones para otras consultas...
 }

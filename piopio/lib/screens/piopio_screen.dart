@@ -17,8 +17,8 @@ class PioPio extends StatefulWidget {
 }
 
 class _PioPioState extends State<PioPio> with SingleTickerProviderStateMixin {
-    // Modo de prueba para desktop/web
-    final bool isTestMode = true;
+    // Modo de prueba para desktop/web, hay que borrarlo 
+    final bool isTestMode = false;
   int _selectedIndex = 2;
   static const Color _selectedColor = Colors.black;
   static const Color _unselectedColor = Colors.black45;
@@ -85,7 +85,6 @@ class _PioPioState extends State<PioPio> with SingleTickerProviderStateMixin {
   }
 
   // ---- PROCESO PRINCIPAL ----
-
   Future<void> _startIdentificationProcess() async {
     if (_isProcessing) return;
 
@@ -115,7 +114,6 @@ class _PioPioState extends State<PioPio> with SingleTickerProviderStateMixin {
         throw Exception("Ubicación no disponible. Necesaria para la API.");
       }
 
-      // final dir = await getExternalStorageDirectory();
       final dir = await getApplicationDocumentsDirectory();
       if (dir == null) return;
 
@@ -125,7 +123,7 @@ class _PioPioState extends State<PioPio> with SingleTickerProviderStateMixin {
       await _recorder.start(
         const RecordConfig(
           encoder: AudioEncoder.wav,
-          sampleRate: 44100,
+          sampleRate: 48000,
           numChannels: 2,
         ),
         path: filePath,
@@ -155,16 +153,30 @@ class _PioPioState extends State<PioPio> with SingleTickerProviderStateMixin {
         _lastLocationData!.longitude!,
       );
 
+      if (!result.error) {
+        final commonName = result.commonName ?? result.scientificName;
+        final scientificName = result.scientificName;
+        final imageUrl = result.speciesImg ?? 'assets/bird_placeholder.jpg';
+        final description = result.speciesData ?? 'Sin descripción disponible.';
+        _confettiController.play();
+        showBirdRecognitionPopup(
+          context: context,
+          imagePath: imageUrl,
+          commonName: commonName,
+          scientificName: scientificName,
+          description: description,
+        );
         setState(() {
           _statusMessage = 'Identificación Completa!';
-          if (!result.error) {
-            _lastResult =
-                'AVE ENCONTRADA:\n${result.scientificName}\nUbicación: ${result.lat.toStringAsFixed(4)}, ${result.lon.toStringAsFixed(4)}';
-          } else {
-            _lastResult =
-                'No se pudo identificar el ave. Datos recibidos: ${result.filename}';
-          }
+          _lastResult =
+              'AVE ENCONTRADA:\n$scientificName\nConfianza: ${(result.confidence ?? 0).toStringAsFixed(3)}\nUbicación: ${result.lat.toStringAsFixed(4)}, ${result.lon.toStringAsFixed(4)}';
         });
+      } else {
+        setState(() {
+          _statusMessage = 'No se pudo identificar el ave.';
+          _lastResult = 'No se pudo identificar. Archivo: ${result.filename}';
+        });
+      }
     } catch (e) {
       print('Error: $e');
       setState(() {
@@ -348,12 +360,12 @@ class _PioPioState extends State<PioPio> with SingleTickerProviderStateMixin {
             ),
           ),
 
-          /// --- WIDGET SEPARADO ---
-          DebugPanel(
-            debugFilePath: _debugFilePath,
-            debugLocation: _debugLocation,
-            lastResult: _lastResult,
-          ),
+          /// --- WIDGET SEPARADO --- No lo vamos a usar en demos, solo debug, dejarlo comentado
+          //DebugPanel(
+            //debugFilePath: _debugFilePath,
+            //debugLocation: _debugLocation,
+            //lastResult: _lastResult,
+          //),
         ],
       ),
       bottomNavigationBar: BottomNavigationBar(

@@ -39,12 +39,24 @@ void showBirdRecognitionPopup({
                   const SizedBox(height: 15),
                   ClipRRect(
                     borderRadius: BorderRadius.circular(20),
-                    child: Image.asset(
-                      imagePath,
-                      width: 250,
-                      height: 250,
-                      fit: BoxFit.cover,
-                    ),
+                    child: imagePath.startsWith('http')
+                        ? Image.network(
+                            imagePath,
+                            width: 250,
+                            height: 250,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => const SizedBox(
+                              width: 250,
+                              height: 250,
+                              child: Center(child: Text('Imagen no disponible')),
+                            ),
+                          )
+                        : Image.asset(
+                            imagePath,
+                            width: 250,
+                            height: 250,
+                            fit: BoxFit.cover,
+                          ),
                   ),
                   const SizedBox(height: 20),
                   Text(

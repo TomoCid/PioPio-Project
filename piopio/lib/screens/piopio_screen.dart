@@ -17,6 +17,8 @@ class PioPio extends StatefulWidget {
 }
 
 class _PioPioState extends State<PioPio> with SingleTickerProviderStateMixin {
+    // Modo de prueba para desktop/web
+    final bool isTestMode = true;
   int _selectedIndex = 2;
   static const Color _selectedColor = Colors.black;
   static const Color _unselectedColor = Colors.black45;
@@ -27,7 +29,7 @@ class _PioPioState extends State<PioPio> with SingleTickerProviderStateMixin {
 
   late final AnimationController _pulseController;
   bool _isProcessing = false;
-  String _statusMessage = 'Toca para empezar a grabar y identificar un ave.';
+  String _statusMessage = 'Toca para empezar a grabar e identificar un ave.';
   String? _lastResult;
 
   String? _debugFilePath;
@@ -113,7 +115,8 @@ class _PioPioState extends State<PioPio> with SingleTickerProviderStateMixin {
         throw Exception("Ubicación no disponible. Necesaria para la API.");
       }
 
-      final dir = await getExternalStorageDirectory();
+      // final dir = await getExternalStorageDirectory();
+      final dir = await getApplicationDocumentsDirectory();
       if (dir == null) return;
 
       final filePath =
@@ -130,8 +133,13 @@ class _PioPioState extends State<PioPio> with SingleTickerProviderStateMixin {
 
       await Future.delayed(const Duration(seconds: 5));
 
-      savedPath = await _recorder.stop();
-      if (savedPath == null) throw Exception('Archivo grabado nulo.');
+      if (isTestMode) {
+        // Usar archivo de audio de prueba en modo test
+        savedPath = '/home/ccserm/Documents/ws/udec/proyectoInf/PioPio-Project/piopio/assets/test_audio.wav';
+      } else {
+        savedPath = await _recorder.stop();
+        if (savedPath == null) throw Exception('Archivo grabado nulo.');
+      }
 
       setState(() {
         _debugFilePath = savedPath;
@@ -147,16 +155,16 @@ class _PioPioState extends State<PioPio> with SingleTickerProviderStateMixin {
         _lastLocationData!.longitude!,
       );
 
-      setState(() {
-        _statusMessage = 'Identificación Completa!';
-        if (!result.error) {
-          _lastResult =
-              'AVE ENCONTRADA:\n${result.scientificName}\nUbicación: ${result.lat.toStringAsFixed(4)}, ${result.lon.toStringAsFixed(4)}';
-        } else {
-          _lastResult =
-              'No se pudo identificar el ave. Datos recibidos: ${result.filename}';
-        }
-      });
+        setState(() {
+          _statusMessage = 'Identificación Completa!';
+          if (!result.error) {
+            _lastResult =
+                'AVE ENCONTRADA:\n${result.scientificName}\nUbicación: ${result.lat.toStringAsFixed(4)}, ${result.lon.toStringAsFixed(4)}';
+          } else {
+            _lastResult =
+                'No se pudo identificar el ave. Datos recibidos: ${result.filename}';
+          }
+        });
     } catch (e) {
       print('Error: $e');
       setState(() {
@@ -175,6 +183,19 @@ class _PioPioState extends State<PioPio> with SingleTickerProviderStateMixin {
 
   Future<void> _getLocation() async {
     try {
+      if (isTestMode) {
+        // Mock de ubicación para pruebas
+        final locationData = LocationData.fromMap({
+          'latitude': -33.4489,
+          'longitude': -70.6693,
+        });
+        setState(() {
+          _lastLocationData = locationData;
+          _debugLocation =
+              'Lat: ${locationData.latitude?.toStringAsFixed(4)}, Lon: ${locationData.longitude?.toStringAsFixed(4)}';
+        });
+        return;
+      }
       bool serviceEnabled = await _location.serviceEnabled();
       if (!serviceEnabled) serviceEnabled = await _location.requestService();
       if (!serviceEnabled) return;
@@ -281,15 +302,6 @@ class _PioPioState extends State<PioPio> with SingleTickerProviderStateMixin {
                 ),
                 GestureDetector(
                   onTap: isProcessing ? null : _startIdentificationProcess,
-                  onLongPress: () {
-                    showBirdRecognitionPopup(
-                      context: context,
-                      imagePath: 'assets/pimpollo.jpg',
-                      commonName: 'Pimpollo',
-                      scientificName: 'Rollandia rolland',
-                    );
-                    _confettiController.play();
-                  },
                   child: ScaleTransition(
                     scale: _pulseController,
                     child: Container(

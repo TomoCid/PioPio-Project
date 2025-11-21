@@ -5,6 +5,7 @@ void showBirdRecognitionPopup({
   required String imagePath,
   required String commonName,
   required String scientificName,
+  required String description,
 }) {
   showModalBottomSheet(
     context: context,
@@ -26,6 +27,16 @@ void showBirdRecognitionPopup({
               padding: const EdgeInsets.all(20.0),
               child: Column(
                 children: [
+                  Text(
+                    '¡Felicidades! Has encontrado a $commonName',
+                    style: const TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.green,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 15),
                   ClipRRect(
                     borderRadius: BorderRadius.circular(20),
                     child: Image.asset(
@@ -51,6 +62,15 @@ void showBirdRecognitionPopup({
                       fontStyle: FontStyle.italic,
                       color: Colors.black54,
                     ),
+                  ),
+                  const SizedBox(height: 15),
+                  Text(
+                    description,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      color: Colors.black87,
+                    ),
+                    textAlign: TextAlign.justify,
                   ),
                   const SizedBox(height: 25),
                   Row(

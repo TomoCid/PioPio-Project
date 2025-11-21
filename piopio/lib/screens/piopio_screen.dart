@@ -125,7 +125,7 @@ class _PioPioState extends State<PioPio> with SingleTickerProviderStateMixin {
       await _recorder.start(
         const RecordConfig(
           encoder: AudioEncoder.wav,
-          sampleRate: 44100,
+          sampleRate: 48000,
           numChannels: 2,
         ),
         path: filePath,

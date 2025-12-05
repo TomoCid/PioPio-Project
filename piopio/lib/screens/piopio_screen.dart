@@ -8,6 +8,9 @@ import 'package:confetti/confetti.dart';
 import '../services/bird_detail_service.dart';
 import '../widgets/bird_popup.dart';
 import '../widgets/debug_panel.dart';
+import '../widgets/nav_bar.dart';
+import 'bird_encyclopedia_screen.dart';
+import 'user_search_screen.dart';
 
 class PioPio extends StatefulWidget {
   const PioPio({super.key});
@@ -17,8 +20,8 @@ class PioPio extends StatefulWidget {
 }
 
 class _PioPioState extends State<PioPio> with SingleTickerProviderStateMixin {
-    // Modo de prueba para desktop/web, hay que borrarlo 
-    final bool isTestMode = false;
+  // Modo de prueba para desktop/web, hay que borrarlo
+  final bool isTestMode = false;
   int _selectedIndex = 2;
   static const Color _selectedColor = Colors.black;
   static const Color _unselectedColor = Colors.black45;
@@ -48,8 +51,9 @@ class _PioPioState extends State<PioPio> with SingleTickerProviderStateMixin {
       upperBound: 1.05,
     );
 
-    _confettiController =
-        ConfettiController(duration: const Duration(seconds: 2));
+    _confettiController = ConfettiController(
+      duration: const Duration(seconds: 2),
+    );
   }
 
   @override
@@ -66,25 +70,6 @@ class _PioPioState extends State<PioPio> with SingleTickerProviderStateMixin {
     });
   }
 
-  Widget _buildCustomIcon(int index) {
-    final color = _selectedIndex == index ? _selectedColor : _unselectedColor;
-    return Image.asset(
-      'assets/logo.png',
-      width: 50,
-      height: 50,
-      color: color,
-      colorBlendMode: BlendMode.srcIn,
-    );
-  }
-
-  Widget _buildStandardIcon(IconData iconData, int index) {
-    return Icon(
-      iconData,
-      color: _selectedIndex == index ? _selectedColor : _unselectedColor,
-    );
-  }
-
-  // ---- PROCESO PRINCIPAL ----
   Future<void> _startIdentificationProcess() async {
     if (_isProcessing) return;
 
@@ -133,7 +118,8 @@ class _PioPioState extends State<PioPio> with SingleTickerProviderStateMixin {
 
       if (isTestMode) {
         // Usar archivo de audio de prueba en modo test
-        savedPath = '/home/ccserm/Documents/ws/udec/proyectoInf/PioPio-Project/piopio/assets/test_audio.wav';
+        savedPath =
+            '/home/ccserm/Documents/ws/udec/proyectoInf/PioPio-Project/piopio/assets/test_audio.wav';
       } else {
         savedPath = await _recorder.stop();
         if (savedPath == null) throw Exception('Archivo grabado nulo.');
@@ -232,8 +218,6 @@ class _PioPioState extends State<PioPio> with SingleTickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
-    final isProcessing = _isProcessing;
-
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
@@ -247,149 +231,159 @@ class _PioPioState extends State<PioPio> with SingleTickerProviderStateMixin {
           IconButton(
             onPressed: () => print('Botón configuración'),
             icon: const Icon(Icons.display_settings, color: Colors.black),
-          )
+          ),
         ],
       ),
-      body: Stack(
-        children: [
-          Positioned.fill(
-            child: Image.asset(
-              'assets/bg.jpg',
-              fit: BoxFit.cover,
-              opacity: const AlwaysStoppedAnimation(0.8),
-            ),
+      body: _buildBodyContent(),
+
+      bottomNavigationBar: NavBar(
+        currentIndex: _selectedIndex,
+        onTap: _onItemTapped,
+      ),
+    );
+  }
+
+  Widget _buildBodyContent() {
+    switch (_selectedIndex) {
+      case 0:
+        return const BirdEncyclopediaScreen();
+      case 1:
+        return const Center(child: Text("Mapa (WIP)"));
+      case 2:
+        return _buildScannerView();
+      case 3:
+        return const UserSearchScreen();
+      case 4:
+        return const Center(child: Text("Perfil (WIP)"));
+      default:
+        return _buildScannerView();
+    }
+  }
+
+  Widget _buildScannerView() {
+    final isProcessing = _isProcessing;
+
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: Image.asset(
+            'assets/bg.jpg',
+            fit: BoxFit.cover,
+            opacity: const AlwaysStoppedAnimation(0.8),
           ),
-          Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: MediaQuery.of(context).size.width * 0.8,
-                  padding: const EdgeInsets.all(16.0),
-                  margin: const EdgeInsets.only(bottom: 32.0),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.6),
-                    borderRadius: BorderRadius.circular(12.0),
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Text(
-                        'Identify Bird Songs',
-                        style: TextStyle(
-                          fontSize: 30,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
+        ),
+
+        Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: MediaQuery.of(context).size.width * 0.8,
+                padding: const EdgeInsets.all(16.0),
+                margin: const EdgeInsets.only(bottom: 32.0),
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.6),
+                  borderRadius: BorderRadius.circular(12.0),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text(
+                      'Identify Bird Songs',
+                      style: TextStyle(
+                        fontSize: 30,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
                       ),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      _statusMessage,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontStyle: FontStyle.italic,
+                        color: _pulseController.isAnimating
+                            ? Colors.redAccent
+                            : Colors.white70,
+                      ),
+                    ),
+                    if (_lastResult != null) ...[
                       const SizedBox(height: 12),
+                      const Divider(color: Colors.white38),
                       Text(
-                        _statusMessage,
+                        _lastResult!,
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           fontSize: 18,
-                          fontStyle: FontStyle.italic,
-                          color: _pulseController.isAnimating
-                              ? Colors.redAccent
-                              : Colors.white70,
+                          fontWeight: FontWeight.bold,
+                          color: _lastResult!.startsWith('✅')
+                              ? Colors.lightGreenAccent
+                              : Colors.redAccent[100],
                         ),
                       ),
-                      if (_lastResult != null) ...[
-                        const SizedBox(height: 12),
-                        const Divider(color: Colors.white38),
-                        Text(
-                          _lastResult!,
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: _lastResult!.startsWith('✅')
-                                ? Colors.lightGreenAccent
-                                : Colors.redAccent[100],
-                          ),
-                        )
-                      ]
                     ],
-                  ),
+                  ],
                 ),
-                GestureDetector(
-                  onTap: isProcessing ? null : _startIdentificationProcess,
-                  child: ScaleTransition(
-                    scale: _pulseController,
-                    child: Container(
-                      width: 200,
-                      height: 200,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: Colors.white.withOpacity(0.5),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.2),
-                            blurRadius: 15,
-                            spreadRadius: 2,
-                          ),
-                        ],
-                      ),
-                      child: Center(
-                        child: ClipOval(
-                          child: Image.asset(
-                            'assets/logo.png',
-                            fit: BoxFit.cover,
-                          ),
+              ),
+
+              GestureDetector(
+                onTap: isProcessing ? null : _startIdentificationProcess,
+                child: ScaleTransition(
+                  scale: _pulseController,
+                  child: Container(
+                    width: 200,
+                    height: 200,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.white.withOpacity(0.5),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.2),
+                          blurRadius: 15,
+                          spreadRadius: 2,
+                        ),
+                      ],
+                    ),
+                    child: Center(
+                      child: ClipOval(
+                        child: Image.asset(
+                          'assets/logo.png',
+                          fit: BoxFit.cover,
                         ),
                       ),
                     ),
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-          Align(
-            alignment: Alignment.topCenter,
-            child: ConfettiWidget(
-              confettiController: _confettiController,
-              blastDirectionality: BlastDirectionality.explosive,
-              shouldLoop: false,
-              colors: const [
-                Colors.green,
-                Colors.blue,
-                Colors.pink,
-                Colors.orange,
-                Colors.purple
-              ],
-            ),
-          ),
+        ),
 
-          /// --- WIDGET SEPARADO --- No lo vamos a usar en demos, solo debug, dejarlo comentado
-          //DebugPanel(
-            //debugFilePath: _debugFilePath,
-            //debugLocation: _debugLocation,
-            //lastResult: _lastResult,
-          //),
-        ],
-      ),
-      bottomNavigationBar: BottomNavigationBar(
-        type: BottomNavigationBarType.fixed,
-        items: <BottomNavigationBarItem>[
-          BottomNavigationBarItem(
-              icon: _buildStandardIcon(Icons.auto_stories_outlined, 0),
-              label: 'Encyclopedia'),
-          BottomNavigationBarItem(
-              icon: _buildStandardIcon(Icons.map, 1), label: 'Map'),
-          BottomNavigationBarItem(
-              icon: _buildCustomIcon(2), label: 'PioPio'),
-          BottomNavigationBarItem(
-              icon: _buildStandardIcon(Icons.message, 3), label: 'Social'),
-          BottomNavigationBarItem(
-              icon: _buildStandardIcon(Icons.account_circle, 4),
-              label: 'Profile')
-        ],
-        currentIndex: _selectedIndex,
-        selectedItemColor: _selectedColor,
-        unselectedItemColor: _unselectedColor,
-        selectedFontSize: 15,
-        onTap: _onItemTapped,
-      ),
+        Align(
+          alignment: Alignment.topCenter,
+          child: ConfettiWidget(
+            confettiController: _confettiController,
+            blastDirectionality: BlastDirectionality.explosive,
+            shouldLoop: false,
+            colors: const [
+              Colors.green,
+              Colors.blue,
+              Colors.pink,
+              Colors.orange,
+              Colors.purple,
+            ],
+          ),
+        ),
+
+        /*
+        DebugPanel(
+          debugFilePath: _debugFilePath,
+          debugLocation: _debugLocation,
+          lastResult: _lastResult,
+        ),
+        */
+      ],
     );
   }
 }

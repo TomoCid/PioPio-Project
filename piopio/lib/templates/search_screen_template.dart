@@ -2,21 +2,18 @@ import 'package:flutter/material.dart';
 
 class SearchScreenTemplate extends StatelessWidget {
   final String searchHint;
-  final int navIndex;
+
   final Widget Function(BuildContext context, int index) itemBuilder;
   final int itemCount;
   final TextEditingController searchController;
   final Function(String)? onSearchChanged;
-  final Function(int) onNavTap;
 
   const SearchScreenTemplate({
     super.key,
     required this.searchHint,
-    required this.navIndex,
     required this.itemBuilder,
     required this.itemCount,
     required this.searchController,
-    required this.onNavTap,
     this.onSearchChanged,
   });
 
@@ -62,7 +59,6 @@ class SearchScreenTemplate extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 16),
-
                 Expanded(
                   child: ListView.builder(
                     padding: const EdgeInsets.only(bottom: 20),

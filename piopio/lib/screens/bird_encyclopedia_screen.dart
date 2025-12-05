@@ -43,15 +43,12 @@ class _BirdEncyclopediaScreenState extends State<BirdEncyclopediaScreen> {
   }
 
   @override
+  @override
   Widget build(BuildContext context) {
     return SearchScreenTemplate(
       searchHint: 'Search birds...',
-      navIndex: 0,
       searchController: _searchController,
       onSearchChanged: _handleSearch,
-      onNavTap: (index) {
-        print("Navegar al índice $index");
-      },
       itemCount: _filteredBirds.length,
       itemBuilder: (context, index) {
         final birdName = _filteredBirds[index];

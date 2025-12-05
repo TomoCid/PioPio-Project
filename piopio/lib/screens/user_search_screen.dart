@@ -24,29 +24,45 @@ class _UserSearchScreenState extends State<UserSearchScreen> {
     'Mirro 500',
   ];
 
+  List<String> _filteredUsers = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _filteredUsers = _users;
+  }
+
+  void _handleSearch(String query) {
+    setState(() {
+      if (query.isEmpty) {
+        _filteredUsers = _users;
+      } else {
+        _filteredUsers = _users
+            .where((user) => user.toLowerCase().contains(query.toLowerCase()))
+            .toList();
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return SearchScreenTemplate(
       searchHint: 'Search users...',
-      navIndex: 3,
       searchController: _searchController,
-      onNavTap: (index) {
-        print("Navegar al índice $index");
-      },
-      itemCount: _users.length,
+      onSearchChanged: _handleSearch,
+      itemCount: _filteredUsers.length,
       itemBuilder: (context, index) {
+        final userName = _filteredUsers[index];
+
         return GenericSearchItem(
           leftContent: const Icon(
             Icons.person_outline,
             size: 40,
             color: Colors.black87,
           ),
-          rightContent: Text(
-            _users[index],
-            style: const TextStyle(fontSize: 18),
-          ),
+          rightContent: Text(userName, style: const TextStyle(fontSize: 18)),
           onTap: () {
-            print('Ver perfil de: ${_users[index]}');
+            print('Ver perfil de: $userName');
           },
         );
       },

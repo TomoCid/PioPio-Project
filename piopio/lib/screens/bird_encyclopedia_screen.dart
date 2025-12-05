@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show rootBundle;
+import 'package:csv/csv.dart';
+
+import '../models/bird_detail_model.dart';
 import '../templates/search_screen_template.dart';
 import '../widgets/generic_search_item.dart';
+import 'bird_detail_screen.dart';
 
 class BirdEncyclopediaScreen extends StatefulWidget {
   const BirdEncyclopediaScreen({super.key});
@@ -11,23 +16,52 @@ class BirdEncyclopediaScreen extends StatefulWidget {
 
 class _BirdEncyclopediaScreenState extends State<BirdEncyclopediaScreen> {
   final TextEditingController _searchController = TextEditingController();
-
-  //Datos de prueba para debuggear. Cambiarlos por datos que recupere de la API.
-  final List<String> _allBirds = [
-    'Chincol',
-    'Loica',
-    'Picaflor Chico',
-    'Queltehue',
-    'Tiuque',
-    'Moltres',
-    'Pidgey',
-  ];
-  List<String> _filteredBirds = [];
+  
+  bool _isLoading = true;
+  List<BirdDetailResult> _allBirds = [];
+  List<BirdDetailResult> _filteredBirds = [];
 
   @override
   void initState() {
     super.initState();
-    _filteredBirds = _allBirds;
+    _loadBirdsFromCsv();
+  }
+
+  Future<void> _loadBirdsFromCsv() async {
+    try {
+      final rawCsvData = await rootBundle.loadString('lib/Birds/reduced_taxonomy.csv');
+      
+      List<List<dynamic>> csvTable = const CsvToListConverter().convert(rawCsvData);
+
+      final csvRows = csvTable.sublist(1);
+
+      final birds = csvRows.map((row) {
+        return BirdDetailResult(
+          scientificName: row[0].toString(),
+          commonName: row[1].toString(),
+          speciesCode: row[2].toString(),
+          speciesImg: row[6].toString(),
+          speciesData: row[7].toString(), 
+          filename: '',
+          confidence: null,
+          lat: 0.0,
+          lon: 0.0,
+          date: null,
+          error: false,
+        );
+      }).toList();
+
+      setState(() {
+        _allBirds = birds;
+        _filteredBirds = birds;
+        _isLoading = false;
+      });
+    } catch (e) {
+      print("/ff Error al cargar el CSV: $e");
+      setState(() {
+        _isLoading = false;
+      });
+    }
   }
 
   void _handleSearch(String query) {
@@ -36,33 +70,68 @@ class _BirdEncyclopediaScreenState extends State<BirdEncyclopediaScreen> {
         _filteredBirds = _allBirds;
       } else {
         _filteredBirds = _allBirds
-            .where((bird) => bird.toLowerCase().contains(query.toLowerCase()))
+            .where((bird) =>
+                (bird.commonName ?? '').toLowerCase().contains(query.toLowerCase()) ||
+                bird.scientificName.toLowerCase().contains(query.toLowerCase()))
             .toList();
       }
     });
   }
 
   @override
-  @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_allBirds.isEmpty) {
+      return const Center(child: Text('No se pudieron cargar las aves desde el archivo local. ggs'));
+    }
+
     return SearchScreenTemplate(
-      searchHint: 'Search birds...',
+      searchHint: 'Buscar en la enciclopedia...',
       searchController: _searchController,
       onSearchChanged: _handleSearch,
       itemCount: _filteredBirds.length,
       itemBuilder: (context, index) {
-        final birdName = _filteredBirds[index];
+        final bird = _filteredBirds[index];
         return GenericSearchItem(
           leftContent: Padding(
-            padding: const EdgeInsets.all(12.0),
-            child: Image.asset('assets/logo.png', color: Colors.black),
+            padding: const EdgeInsets.all(8.0),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: Image.network(
+                bird.speciesImg ?? 'assets/logo.png',
+                width: 60,
+                height: 60,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => Image.asset('assets/logo.png', width: 60),
+              ),
+            ),
           ),
-          rightContent: Text(
-            birdName,
-            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          rightContent: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                bird.commonName ?? bird.scientificName,
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                overflow: TextOverflow.ellipsis,
+              ),
+              Text(
+                bird.scientificName,
+                style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
           ),
           onTap: () {
-            print('Tocaste el ave: $birdName');
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => BirdDetailScreen(bird: bird),
+              ),
+            );
           },
         );
       },

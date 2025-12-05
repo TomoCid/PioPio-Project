@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
+import '../models/bird_detail_model.dart'; 
+import '../screens/bird_detail_screen.dart'; 
 
 void showBirdRecognitionPopup({
   required BuildContext context,
-  required String imagePath,
-  required String commonName,
-  required String scientificName,
-  required String description,
+  required BirdDetailResult result, 
 }) {
+  final commonName = result.commonName ?? result.scientificName;
+  final scientificName = result.scientificName;
+  final imagePath = result.speciesImg ?? 'assets/logo.png';
+  final description = result.speciesData ?? 'Descripción no disponible.';
+
   showModalBottomSheet(
     context: context,
     isScrollControlled: true,
@@ -94,7 +98,15 @@ void showBirdRecognitionPopup({
                         label: const Text("Compartir"),
                       ),
                       ElevatedButton.icon(
-                        onPressed: () {},
+                        onPressed: () {
+                          Navigator.pop(context); 
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => BirdDetailScreen(bird: result),
+                            ),
+                          );
+                        },
                         icon: const Icon(Icons.info_outline),
                         label: const Text("Detalles"),
                       ),

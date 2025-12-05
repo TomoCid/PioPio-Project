@@ -62,5 +62,4 @@ class BirdRecognitionService {
       throw Exception('Error al enviar audio al servidor: $errorMsg');
     }
   }
-
 }

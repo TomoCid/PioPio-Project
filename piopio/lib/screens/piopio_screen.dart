@@ -11,6 +11,7 @@ import '../widgets/debug_panel.dart';
 import '../widgets/nav_bar.dart';
 import 'bird_encyclopedia_screen.dart';
 import 'user_search_screen.dart';
+import 'bird_detail_screen.dart'; 
 
 class PioPio extends StatefulWidget {
   const PioPio({super.key});
@@ -140,22 +141,18 @@ class _PioPioState extends State<PioPio> with SingleTickerProviderStateMixin {
       );
 
       if (!result.error) {
-        final commonName = result.commonName ?? result.scientificName;
-        final scientificName = result.scientificName;
-        final imageUrl = result.speciesImg ?? 'assets/bird_placeholder.jpg';
-        final description = result.speciesData ?? 'Sin descripción disponible.';
         _confettiController.play();
+
+        // En lugar de pasar cada dato al popup, pasamos el objeto 'result' completo
         showBirdRecognitionPopup(
           context: context,
-          imagePath: imageUrl,
-          commonName: commonName,
-          scientificName: scientificName,
-          description: description,
+          result: result, // Pasamos el objeto entero
         );
+
         setState(() {
           _statusMessage = 'Identificación Completa!';
           _lastResult =
-              'AVE ENCONTRADA:\n$scientificName\nConfianza: ${(result.confidence ?? 0).toStringAsFixed(3)}\nUbicación: ${result.lat.toStringAsFixed(4)}, ${result.lon.toStringAsFixed(4)}';
+              'AVE ENCONTRADA:\n${result.scientificName}\nConfianza: ${(result.confidence ?? 0).toStringAsFixed(3)}';
         });
       } else {
         setState(() {
